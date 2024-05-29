@@ -10,10 +10,12 @@
     "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
     "test": "echo \"No test specified\" && exit 0",
     "dev": "quasar dev",
-    "build": "quasar build"
+    "build": "quasar build -m pwa -d",
+    "deploy": "vercel"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.4",
+    "chart.js": "^4.4.3",
     "pinia": "^2.1.7",
     "quasar": "^2.16.0",
     "vue": "^3.4.18",

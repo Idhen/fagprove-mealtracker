@@ -1,13 +1,15 @@
+import IndexPage from "pages/IndexPage.vue";
 import MealForm from "pages/MealFormPage.vue";
-//import DailyForm from "pages/DailyFormPage.vue";
+import DailyForm from "pages/DailyFormPage.vue";
 
 const routes = [
   {
     path: "/",
     component: () => import("layouts/MainLayout.vue"),
     children: [
+      { path: "", component: IndexPage },
       { path: "meals", component: MealForm },
-      // { path: "daily", component: DailyForm },
+      { path: "daily", component: DailyForm },
     ],
   },
 

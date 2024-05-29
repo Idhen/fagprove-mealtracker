@@ -4,18 +4,18 @@
       <q-card-section class="row justify-center items-center">
         <q-select
           filled
-          v-model="input"
+          v-model="searchTerm"
           use-input
           hide-selected
           fill-input
           input-debounce="0"
-          :loading="currentlyFetching"
           :options="filteredOptions"
           option-label="foodName"
           @filter="filterFn"
           hint="Søk en ingrediens. Verdier vises for 100g."
           style="width: 70%"
           class="q-mr-sm"
+          @update:model-value="onIngredientSelect"
         />
 
         <q-btn
@@ -68,6 +68,7 @@
                 hint="Mengde i gram"
                 type="number"
                 v-model.number="model"
+                @change="onAmountChange"
               />
             </td>
             <td style="padding: 7px">
@@ -86,27 +87,31 @@
       <q-card-section class="text-center" style="padding: 16px 10px">
         <q-badge
           class="q-ma-xs"
-          :label="`${parseInt(totalNutrients.calories) || 0} kcal`"
+          :label="`${parseInt(customMeal?.totalNutrients?.calories) || 0} kcal`"
         />
         <q-badge
           class="q-ma-xs"
           color="orange"
-          :label="`${parseInt(totalNutrients.protein) || 0}g protein`"
+          :label="`${
+            parseInt(customMeal?.totalNutrients?.protein) || 0
+          }g protein`"
         />
         <q-badge
           class="q-ma-xs"
           color="brown"
-          :label="`${parseInt(totalNutrients.fiber) || 0}g fiber`"
+          :label="`${parseInt(customMeal?.totalNutrients?.fiber) || 0}g fiber`"
         />
         <q-badge
           class="q-ma-xs"
           color="grey"
-          :label="`${parseInt(totalNutrients.fett) || 0}g fett`"
+          :label="`${parseInt(customMeal?.totalNutrients?.fett) || 0}g fett`"
         />
         <q-badge
           class="q-ma-xs"
           color="green"
-          :label="`${parseInt(totalNutrients.karbo) || 0}g karbohydrat`"
+          :label="`${
+            parseInt(customMeal?.totalNutrients?.karbo) || 0
+          }g karbohydrat`"
         />
       </q-card-section>
 
@@ -136,10 +141,11 @@
           fill-input
           input-debounce="0"
           :options="foodStore.userCustomMeals"
-          option-label="name"
+          option-label="foodName"
+          @update:model-value="onMealSelect"
           :hint="
             customMeal
-              ? 'Valgt måltid: ' + customMeal.name
+              ? 'Valgt måltid: ' + customMeal.foodName
               : 'Velg et eksisterende måltid...'
           "
         />
@@ -154,69 +160,43 @@ import { useFoodStore } from "../stores/foodStore";
 
 const foodStore = useFoodStore();
 
-const options = ref([]);
 const filteredOptions = ref([]);
 
-const currentlyFetching = ref(false);
-
-const input = ref("");
+const searchTerm = ref("");
 
 const selectedItemNutrients = ref({});
 
 const newCustomMealName = ref();
 
-const totalNutrients = ref({
-  calories: 0,
-  protein: 0,
-  fiber: 0,
-  fett: 0,
-  karbo: 0,
-});
-
 const customMeal = ref();
-
-onMounted(async () => {
-  foodStore.fetchCustomMeals(); // Move this to mounting of the app itself - or the front page.
-
-  currentlyFetching.value = true;
-  await foodStore.fetchData();
-  currentlyFetching.value = false;
-  options.value = foodStore.foodData.foods;
-});
 
 const filterFn = (val, update) => {
   update(() => {
-    filteredOptions.value = options.value.filter((option) => {
+    filteredOptions.value = foodStore.apiFoodData.foods.filter((option) => {
       return option.foodName.toLowerCase().includes(val.toLowerCase());
     });
   });
 };
 
-watch(input, (newInput) => {
-  // Redo, rename
-  if (input.value) {
+function onIngredientSelect() {
+  if (searchTerm.value) {
     selectedItemNutrients.value = {
-      calories: newInput.calories.quantity,
-      protein: newInput.constituents.find((val) => val.nutrientId === "Protein")
-        .quantity,
-      fiber: newInput.constituents.find((val) => val.nutrientId === "Fiber")
-        .quantity,
-      fett: newInput.constituents.find((val) => val.nutrientId === "Fett")
-        .quantity,
-      karbo: newInput.constituents.find((val) => val.nutrientId === "Karbo")
-        .quantity,
+      calories: searchTerm.value.calories.quantity,
+      protein: searchTerm.value.constituents.find(
+        (val) => val.nutrientId === "Protein"
+      ).quantity,
+      fiber: searchTerm.value.constituents.find(
+        (val) => val.nutrientId === "Fiber"
+      ).quantity,
+      fett: searchTerm.value.constituents.find(
+        (val) => val.nutrientId === "Fett"
+      ).quantity,
+      karbo: searchTerm.value.constituents.find(
+        (val) => val.nutrientId === "Karbo"
+      ).quantity,
     };
   }
-});
-
-watch(
-  customMeal,
-  (newCustomMeal) => {
-    calculateTotalNutrients();
-    foodStore.addCustomMeal(customMeal.value);
-  },
-  { deep: true }
-);
+}
 
 function calculateTotalNutrients() {
   const newTotalNutrients = {};
@@ -231,18 +211,18 @@ function calculateTotalNutrients() {
     }
     return { ...ingredient, values: multValues };
   });
-
-  totalNutrients.value = newTotalNutrients;
+  customMeal.value.totalNutrients = newTotalNutrients;
+  foodStore.addCustomMeal(customMeal.value);
 }
 
 function addIngredientToCustomMeal() {
-  if (input.value && customMeal.value) {
+  if (searchTerm.value && customMeal.value) {
     customMeal.value.ingredients.push({
-      name: input.value.foodName,
+      name: searchTerm.value.foodName,
       values: selectedItemNutrients.value,
       amount: 100,
     });
-    input.value = "";
+    searchTerm.value = "";
     selectedItemNutrients.value = {};
 
     calculateTotalNutrients();
@@ -254,13 +234,24 @@ function removeIngredientFromCustomMeal(ingredient) {
     (item) => item.name === ingredient
   );
   customMeal.value.ingredients.splice(indexToRemove, 1);
+  calculateTotalNutrients();
+}
 
+function onAmountChange() {
+  calculateTotalNutrients();
+}
+
+function onMealSelect() {
   calculateTotalNutrients();
 }
 
 function createNewCustomMeal() {
   if (newCustomMealName.value) {
-    foodStore.addCustomMeal({ name: newCustomMealName.value, ingredients: [] });
+    foodStore.addCustomMeal({
+      foodName: newCustomMealName.value,
+      ingredients: [],
+      totalNutrients: [],
+    });
     newCustomMealName.value = "";
   }
 }
